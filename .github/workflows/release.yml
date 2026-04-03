@@ -105,6 +105,11 @@ jobs:
             platform: win
             target: nsis
             arch: x64
+          - label: Windows arm64
+            runner: windows-11-arm
+            platform: win
+            target: nsis
+            arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -213,6 +218,12 @@ jobs:
           if [[ "${{ matrix.platform }}" == "mac" && "${{ matrix.arch }}" != "arm64" ]]; then
             if [[ -f release-publish/latest-mac.yml ]]; then
               mv release-publish/latest-mac.yml "release-publish/latest-mac-${{ matrix.arch }}.yml"
+            fi
+          fi
+
+          if [[ "${{ matrix.platform }}" == "win" && "${{ matrix.arch }}" == "arm64" ]]; then
+            if [[ -f release-publish/latest.yml ]]; then
+              mv release-publish/latest.yml "release-publish/latest-win-arm64.yml"
             fi
           fi
 
