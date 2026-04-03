@@ -44,4 +44,18 @@ describe("build-target-arch", () => {
 
     assert.equal(arch, "arm64");
   });
+
+  it("does not apply Windows host env heuristics for non-Windows targets", () => {
+    const arch = getDefaultBuildArch(
+      "linux",
+      "x64",
+      {
+        PROCESSOR_ARCHITECTURE: "AMD64",
+        PROCESSOR_ARCHITEW6432: "ARM64",
+      },
+      { archChoices: ["x64", "arm64"] },
+    );
+
+    assert.equal(arch, "x64");
+  });
 });
