@@ -160,6 +160,11 @@ jobs:
             platform: win
             target: nsis
             arch: x64
+          - label: Windows arm64
+            runner: windows-11-arm
+            platform: win
+            target: nsis
+            arch: arm64
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -270,6 +275,12 @@ jobs:
             for manifest in release-publish/*-mac.yml; do
               mv "$manifest" "${manifest%.yml}-${{ matrix.arch }}.yml"
             done
+          fi
+
+          if [[ "${{ matrix.platform }}" == "win" && "${{ matrix.arch }}" == "arm64" ]]; then
+            if [[ -f release-publish/latest.yml ]]; then
+              mv release-publish/latest.yml "release-publish/latest-win-arm64.yml"
+            fi
           fi
 
       - name: Upload build artifacts
