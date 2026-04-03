@@ -221,11 +221,12 @@ jobs:
             fi
           fi
 
-          # Both Windows NSIS builds emit "latest.yml". Rename the arm64 copy so
-          # the merged release-assets directory keeps both updater manifests.
-          if [[ "${{ matrix.platform }}" == "win" && "${{ matrix.arch }}" == "arm64" ]]; then
+          # Both Windows NSIS builds emit "latest.yml". Rename both per-job
+          # copies so the release job can merge them back into one canonical
+          # Windows latest.yml for electron-updater discovery.
+          if [[ "${{ matrix.platform }}" == "win" ]]; then
             if [[ -f release-publish/latest.yml ]]; then
-              mv release-publish/latest.yml "release-publish/latest-win-arm64.yml"
+              mv release-publish/latest.yml "release-publish/latest-win-${{ matrix.arch }}.yml"
             fi
           fi
 
@@ -297,6 +298,14 @@ jobs:
             release-assets/latest-mac.yml \
             release-assets/latest-mac-x64.yml
           rm -f release-assets/latest-mac-x64.yml
+
+      - name: Merge Windows updater manifests
+        run: |
+          node scripts/merge-win-update-manifests.ts \
+            release-assets/latest-win-arm64.yml \
+            release-assets/latest-win-x64.yml \
+            release-assets/latest.yml
+          rm -f release-assets/latest-win-arm64.yml release-assets/latest-win-x64.yml
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
