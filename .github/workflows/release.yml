@@ -221,6 +221,8 @@ jobs:
             fi
           fi
 
+          # Both Windows NSIS builds emit "latest.yml". Rename the arm64 copy so
+          # the merged release-assets directory keeps both updater manifests.
           if [[ "${{ matrix.platform }}" == "win" && "${{ matrix.arch }}" == "arm64" ]]; then
             if [[ -f release-publish/latest.yml ]]; then
               mv release-publish/latest.yml "release-publish/latest-win-arm64.yml"
