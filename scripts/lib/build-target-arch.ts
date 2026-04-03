@@ -39,7 +39,9 @@ export function getDefaultBuildArch(
   env: NodeJS.ProcessEnv,
   platformConfig: PlatformConfig,
 ): BuildArch {
-  const hostArch = resolveHostProcessArch(process.platform, processArch, env);
+  const nodePlatform: NodeJS.Platform =
+    platform === "win" ? "win32" : platform === "mac" ? "darwin" : "linux";
+  const hostArch = resolveHostProcessArch(nodePlatform, processArch, env);
   if (hostArch && platformConfig.archChoices.includes(hostArch)) {
     return hostArch;
   }
