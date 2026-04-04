@@ -105,4 +105,20 @@ releaseDate: '2026-03-07T10:36:07.540Z'
     assert.equal(manifest.extras.minimumSystemVersion, "13.0");
     assert.equal(manifest.extras.stagingPercentage, 50);
   });
+
+  it("serializes versions without quotes for compatibility", () => {
+    const original = parseMacUpdateManifest(
+      `version: '1.0'
+files:
+  - url: T3-Code-1.0-x64.zip
+    sha512: zipsha
+    size: 1
+releaseDate: '2026-03-07T10:36:07.540Z'
+`,
+      "latest-mac.yml",
+    );
+
+    const serialized = serializeMacUpdateManifest(original);
+    assert.ok(serialized.includes("version: 1.0"));
+  });
 });
