@@ -116,12 +116,7 @@ function extractEnvironmentValue(output: string, name: string): string | undefin
   if (endIndex === -1) return undefined;
 
   let value = output.slice(valueStartIndex, endIndex);
-  if (value.startsWith("\n")) {
-    value = value.slice(1);
-  }
-  if (value.endsWith("\n")) {
-    value = value.slice(0, -1);
-  }
+  value = value.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
 
   return value.length > 0 ? value : undefined;
 }
