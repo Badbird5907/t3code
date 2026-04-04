@@ -428,13 +428,7 @@ export function resolveWindowsEnvironment(
       ? { FNM_MULTISHELL_PATH: profiledEnvironment.FNM_MULTISHELL_PATH }
       : {}),
   };
-  const finalPatch =
-    Object.keys(profiledPatch).length > 0 ? { ...baselinePatch, ...profiledPatch } : baselinePatch;
-  const finalEnv = mergeWindowsEnv(env, finalPatch);
-
-  if (commandAvailable("node", { platform: "win32", env: finalEnv })) {
-    return finalPatch;
-  }
-
-  return finalPatch;
+  return Object.keys(profiledPatch).length > 0
+    ? { ...baselinePatch, ...profiledPatch }
+    : baselinePatch;
 }
