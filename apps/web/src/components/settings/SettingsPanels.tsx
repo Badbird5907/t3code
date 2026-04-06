@@ -1499,7 +1499,11 @@ export function ArchivedThreadsPanel() {
   }, [projects, threads]);
 
   const handleArchivedThreadContextMenu = useCallback(
-    async (threadId: ThreadId, position: { x: number; y: number }) => {
+    async (
+      threadId: ThreadId,
+      position: { x: number; y: number },
+      opts: { skipConfirmation?: boolean } = {},
+    ) => {
       const api = readNativeApi();
       if (!api) return;
       const clicked = await api.contextMenu.show(
@@ -1524,7 +1528,10 @@ export function ArchivedThreadsPanel() {
       }
 
       if (clicked === "delete") {
-        await confirmAndDeleteThread(threadId);
+        await confirmAndDeleteThread(
+          threadId,
+          opts.skipConfirmation ? { skipConfirmation: true } : undefined,
+        );
       }
     },
     [confirmAndDeleteThread, unarchiveThread],
@@ -1557,10 +1564,16 @@ export function ArchivedThreadsPanel() {
                 className="flex items-center justify-between gap-3 border-t border-border px-4 py-3 first:border-t-0 sm:px-5"
                 onContextMenu={(event) => {
                   event.preventDefault();
-                  void handleArchivedThreadContextMenu(thread.id, {
-                    x: event.clientX,
-                    y: event.clientY,
-                  });
+                  void handleArchivedThreadContextMenu(
+                    thread.id,
+                    {
+                      x: event.clientX,
+                      y: event.clientY,
+                    },
+                    {
+                      skipConfirmation: event.shiftKey,
+                    },
+                  );
                 }}
               >
                 <div className="min-w-0 flex-1">

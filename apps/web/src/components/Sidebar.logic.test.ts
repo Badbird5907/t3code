@@ -15,6 +15,7 @@ import {
   resolveSidebarNewThreadEnvMode,
   resolveThreadRowClassName,
   resolveThreadStatusPill,
+  shouldSkipDeleteConfirmation,
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
   sortThreadsForSidebar,
@@ -145,6 +146,16 @@ describe("shouldClearThreadSelectionOnMouseDown", () => {
     } as unknown as HTMLElement;
 
     expect(shouldClearThreadSelectionOnMouseDown(unrelated)).toBe(true);
+  });
+});
+
+describe("shouldSkipDeleteConfirmation", () => {
+  it("skips confirmation when shift is held", () => {
+    expect(shouldSkipDeleteConfirmation({ shiftKey: true })).toBe(true);
+  });
+
+  it("keeps confirmation enabled without shift", () => {
+    expect(shouldSkipDeleteConfirmation({ shiftKey: false })).toBe(false);
   });
 });
 

@@ -176,13 +176,13 @@ export function useThreadActions() {
   );
 
   const confirmAndDeleteThread = useCallback(
-    async (threadId: ThreadId) => {
+    async (threadId: ThreadId, opts: { skipConfirmation?: boolean } = {}) => {
       const api = readNativeApi();
       if (!api) return;
       const thread = useStore.getState().threads.find((entry) => entry.id === threadId);
       if (!thread) return;
 
-      if (appSettings.confirmThreadDelete) {
+      if (appSettings.confirmThreadDelete && !opts.skipConfirmation) {
         const confirmed = await api.dialogs.confirm(
           [
             `Delete thread "${thread.title}"?`,

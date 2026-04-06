@@ -120,6 +120,7 @@ import {
   resolveThreadRowClassName,
   resolveThreadStatusPill,
   orderItemsByPreferredIds,
+  shouldSkipDeleteConfirmation,
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
   sortThreadsForSidebar,
@@ -267,10 +268,14 @@ interface SidebarThreadRowProps {
     orderedProjectThreadIds: readonly ThreadId[],
   ) => void;
   navigateToThread: (threadId: ThreadId) => void;
-  handleMultiSelectContextMenu: (position: { x: number; y: number }) => Promise<void>;
+  handleMultiSelectContextMenu: (
+    position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
+  ) => Promise<void>;
   handleThreadContextMenu: (
     threadId: ThreadId,
     position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
   ) => Promise<void>;
   clearSelection: () => void;
   commitRename: (threadId: ThreadId, newTitle: string, originalTitle: string) => Promise<void>;
@@ -349,18 +354,25 @@ function SidebarThreadRow(props: SidebarThreadRowProps) {
         onContextMenu={(event) => {
           event.preventDefault();
           if (props.selectedThreadIds.size > 0 && props.selectedThreadIds.has(thread.id)) {
-            void props.handleMultiSelectContextMenu({
-              x: event.clientX,
-              y: event.clientY,
-            });
+            void props.handleMultiSelectContextMenu(
+              {
+                x: event.clientX,
+                y: event.clientY,
+              },
+              { skipConfirmation: shouldSkipDeleteConfirmation({ shiftKey: event.shiftKey }) },
+            );
           } else {
             if (props.selectedThreadIds.size > 0) {
               props.clearSelection();
             }
-            void props.handleThreadContextMenu(thread.id, {
-              x: event.clientX,
-              y: event.clientY,
-            });
+            void props.handleThreadContextMenu(
+              thread.id,
+              {
+                x: event.clientX,
+                y: event.clientY,
+              },
+              { skipConfirmation: shouldSkipDeleteConfirmation({ shiftKey: event.shiftKey }) },
+            );
           }
         }}
       >
@@ -1056,7 +1068,11 @@ export default function Sidebar() {
     },
   });
   const handleThreadContextMenu = useCallback(
-    async (threadId: ThreadId, position: { x: number; y: number }) => {
+    async (
+      threadId: ThreadId,
+      position: { x: number; y: number },
+      opts: { skipConfirmation?: boolean } = {},
+    ) => {
       const api = readNativeApi();
       if (!api) return;
       const thread = sidebarThreadsById[threadId];
@@ -1102,7 +1118,7 @@ export default function Sidebar() {
         return;
       }
       if (clicked !== "delete") return;
-      if (appSettings.confirmThreadDelete) {
+      if (appSettings.confirmThreadDelete && !opts.skipConfirmation) {
         const confirmed = await api.dialogs.confirm(
           [
             `Delete thread "${thread.title}"?`,
@@ -1127,7 +1143,7 @@ export default function Sidebar() {
   );
 
   const handleMultiSelectContextMenu = useCallback(
-    async (position: { x: number; y: number }) => {
+    async (position: { x: number; y: number }, opts: { skipConfirmation?: boolean } = {}) => {
       const api = readNativeApi();
       if (!api) return;
       const ids = [...selectedThreadIds];
@@ -1153,7 +1169,7 @@ export default function Sidebar() {
 
       if (clicked !== "delete") return;
 
-      if (appSettings.confirmThreadDelete) {
+      if (appSettings.confirmThreadDelete && !opts.skipConfirmation) {
         const confirmed = await api.dialogs.confirm(
           [
             `Delete ${count} thread${count === 1 ? "" : "s"}?`,
@@ -1233,7 +1249,11 @@ export default function Sidebar() {
   );
 
   const handleProjectContextMenu = useCallback(
-    async (projectId: ProjectId, position: { x: number; y: number }) => {
+    async (
+      projectId: ProjectId,
+      position: { x: number; y: number },
+      opts: { skipConfirmation?: boolean } = {},
+    ) => {
       const api = readNativeApi();
       if (!api) return;
       const project = projects.find((entry) => entry.id === projectId);
@@ -1262,8 +1282,10 @@ export default function Sidebar() {
         return;
       }
 
-      const confirmed = await api.dialogs.confirm(`Remove project "${project.name}"?`);
-      if (!confirmed) return;
+      if (!opts.skipConfirmation) {
+        const confirmed = await api.dialogs.confirm(`Remove project "${project.name}"?`);
+        if (!confirmed) return;
+      }
 
       try {
         const projectDraftThread = getDraftThreadByProjectId(projectId);
@@ -1608,10 +1630,14 @@ export default function Sidebar() {
             onContextMenu={(event) => {
               event.preventDefault();
               suppressProjectClickForContextMenuRef.current = true;
-              void handleProjectContextMenu(project.id, {
-                x: event.clientX,
-                y: event.clientY,
-              });
+              void handleProjectContextMenu(
+                project.id,
+                {
+                  x: event.clientX,
+                  y: event.clientY,
+                },
+                { skipConfirmation: shouldSkipDeleteConfirmation({ shiftKey: event.shiftKey }) },
+              );
             }}
           >
             {!project.expanded && projectStatus ? (
