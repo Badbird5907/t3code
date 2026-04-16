@@ -286,9 +286,9 @@ describe("mergePathValues", () => {
   it("dedupes case-insensitively on Windows while preserving preferred order", () => {
     expect(
       mergePathValues(
-        "win32",
         'C:\\Users\\testuser\\AppData\\Roaming\\npm;"C:\\Program Files\\nodejs"',
         "c:\\users\\testuser\\appdata\\roaming\\npm;C:\\Windows\\System32",
+        "win32",
       ),
     ).toBe(
       'C:\\Users\\testuser\\AppData\\Roaming\\npm;"C:\\Program Files\\nodejs";C:\\Windows\\System32',
@@ -296,7 +296,7 @@ describe("mergePathValues", () => {
   });
 
   it("dedupes case-sensitively on POSIX", () => {
-    expect(mergePathValues("linux", "/usr/local/bin:/usr/bin", "/usr/bin:/USR/BIN")).toBe(
+    expect(mergePathValues("/usr/local/bin:/usr/bin", "/usr/bin:/USR/BIN", "linux")).toBe(
       "/usr/local/bin:/usr/bin:/USR/BIN",
     );
   });
