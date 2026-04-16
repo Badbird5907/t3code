@@ -277,13 +277,15 @@ jobs:
             done
           fi
 
-          # Both Windows NSIS builds emit "latest.yml". Rename both per-job
-          # copies so the release job can merge them back into one canonical
-          # Windows latest.yml for electron-updater discovery.
+          # Windows updater metadata is channel-specific (for example
+          # "latest.yml" or "nightly.yml"). Suffix each per-arch copy so the
+          # release job can merge matching arm64/x64 manifests back into one
+          # canonical manifest per channel.
           if [[ "${{ matrix.platform }}" == "win" ]]; then
-            if [[ -f release-publish/latest.yml ]]; then
-              mv release-publish/latest.yml "release-publish/latest-win-${{ matrix.arch }}.yml"
-            fi
+            shopt -s nullglob
+            for manifest in release-publish/*.yml; do
+              mv "$manifest" "${manifest%.yml}-win-${{ matrix.arch }}.yml"
+            done
           fi
 
       - name: Upload build artifacts
@@ -363,11 +365,28 @@ jobs:
 
       - name: Merge Windows updater manifests
         run: |
-          node scripts/merge-update-manifests.ts --platform win \
-            release-assets/latest-win-arm64.yml \
-            release-assets/latest-win-x64.yml \
-            release-assets/latest.yml
-          rm -f release-assets/latest-win-arm64.yml release-assets/latest-win-x64.yml
+          shopt -s nullglob
+          found_windows_manifest=false
+          for x64_manifest in release-assets/*-win-x64.yml; do
+            arm64_manifest="${x64_manifest/-x64.yml/-arm64.yml}"
+            output_manifest="${x64_manifest/-win-x64.yml/.yml}"
+            if [[ ! -f "$arm64_manifest" ]]; then
+              echo "Missing matching arm64 Windows manifest for $x64_manifest" >&2
+              exit 1
+            fi
+
+            found_windows_manifest=true
+            node scripts/merge-update-manifests.ts --platform win \
+              "$arm64_manifest" \
+              "$x64_manifest" \
+              "$output_manifest"
+            rm -f "$arm64_manifest" "$x64_manifest"
+          done
+
+          if [[ "$found_windows_manifest" != true ]]; then
+            echo "No Windows updater manifests found to merge." >&2
+            exit 1
+          fi
 
       - name: Publish release
         if: needs.preflight.outputs.previous_tag != ''
