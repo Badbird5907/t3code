@@ -9,8 +9,8 @@
 import { spawn } from "node:child_process";
 
 import { EDITORS, OpenError, type EditorId } from "@t3tools/contracts";
-import { isCommandAvailable } from "@t3tools/shared/shell";
-import { ServiceMap, Effect, Layer } from "effect";
+import { isCommandAvailable, type CommandAvailabilityOptions } from "@t3tools/shared/shell";
+import { Context, Effect, Layer } from "effect";
 
 // ==============================
 // Definitions
@@ -70,6 +70,26 @@ function resolveCommandEditorArgs(
   }
 }
 
+function resolveEditorArgs(
+  editor: (typeof EDITORS)[number],
+  target: string,
+): ReadonlyArray<string> {
+  const baseArgs = "baseArgs" in editor ? editor.baseArgs : [];
+  return [...baseArgs, ...resolveCommandEditorArgs(editor, target)];
+}
+
+function resolveAvailableCommand(
+  commands: ReadonlyArray<string>,
+  options: CommandAvailabilityOptions = {},
+): string | null {
+  for (const command of commands) {
+    if (isCommandAvailable(command, options)) {
+      return command;
+    }
+  }
+  return null;
+}
+
 function fileManagerCommandForPlatform(platform: NodeJS.Platform): string {
   switch (platform) {
     case "darwin":
@@ -88,8 +108,16 @@ export function resolveAvailableEditors(
   const available: EditorId[] = [];
 
   for (const editor of EDITORS) {
-    const command = editor.command ?? fileManagerCommandForPlatform(platform);
-    if (isCommandAvailable(command, { platform, env })) {
+    if (editor.commands === null) {
+      const command = fileManagerCommandForPlatform(platform);
+      if (isCommandAvailable(command, { platform, env })) {
+        available.push(editor.id);
+      }
+      continue;
+    }
+
+    const command = resolveAvailableCommand(editor.commands, { platform, env });
+    if (command !== null) {
       available.push(editor.id);
     }
   }
@@ -117,7 +145,7 @@ export interface OpenShape {
 /**
  * Open - Service tag for browser/editor launch operations.
  */
-export class Open extends ServiceMap.Service<Open, OpenShape>()("t3/open") {}
+export class Open extends Context.Service<Open, OpenShape>()("t3/open") {}
 
 // ==============================
 // Implementations
@@ -126,6 +154,7 @@ export class Open extends ServiceMap.Service<Open, OpenShape>()("t3/open") {}
 export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
   input: OpenInEditorInput,
   platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
 ): Effect.fn.Return<EditorLaunch, OpenError> {
   yield* Effect.annotateCurrentSpan({
     "open.editor": input.editor,
@@ -137,10 +166,12 @@ export const resolveEditorLaunch = Effect.fn("resolveEditorLaunch")(function* (
     return yield* new OpenError({ message: `Unknown editor: ${input.editor}` });
   }
 
-  if (editorDef.command) {
+  if (editorDef.commands) {
+    const command =
+      resolveAvailableCommand(editorDef.commands, { platform, env }) ?? editorDef.commands[0];
     return {
-      command: editorDef.command,
-      args: resolveCommandEditorArgs(editorDef, input.cwd),
+      command,
+      args: resolveEditorArgs(editorDef, input.cwd),
     };
   }
 
@@ -160,11 +191,16 @@ export const launchDetached = (launch: EditorLaunch) =>
     yield* Effect.callback<void, OpenError>((resume) => {
       let child;
       try {
-        child = spawn(launch.command, [...launch.args], {
-          detached: true,
-          stdio: "ignore",
-          shell: process.platform === "win32",
-        });
+        const isWin32 = process.platform === "win32";
+        child = spawn(
+          launch.command,
+          isWin32 ? launch.args.map((a) => `"${a}"`) : [...launch.args],
+          {
+            detached: true,
+            stdio: "ignore",
+            shell: isWin32,
+          },
+        );
       } catch (error) {
         return resume(
           Effect.fail(new OpenError({ message: "failed to spawn detached process", cause: error })),

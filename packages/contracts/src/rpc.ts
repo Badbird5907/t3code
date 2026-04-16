@@ -3,11 +3,15 @@ import * as Rpc from "effect/unstable/rpc/Rpc";
 import * as RpcGroup from "effect/unstable/rpc/RpcGroup";
 
 import { OpenError, OpenInEditorInput } from "./editor";
+import { AuthAccessStreamEvent } from "./auth";
+import { FilesystemBrowseInput, FilesystemBrowseResult, FilesystemBrowseError } from "./filesystem";
 import {
   GitActionProgressEvent,
   GitCheckoutInput,
+  GitCheckoutResult,
   GitCommandError,
   GitCreateBranchInput,
+  GitCreateBranchResult,
   GitCreateWorktreeInput,
   GitCreateWorktreeResult,
   GitInitInput,
@@ -24,17 +28,16 @@ import {
   GitRunStackedActionInput,
   GitStatusInput,
   GitStatusResult,
+  GitStatusStreamEvent,
 } from "./git";
 import { KeybindingsConfigError } from "./keybindings";
 import {
   ClientOrchestrationCommand,
-  OrchestrationEvent,
   ORCHESTRATION_WS_METHODS,
   OrchestrationDispatchCommandError,
   OrchestrationGetFullThreadDiffError,
   OrchestrationGetFullThreadDiffInput,
   OrchestrationGetSnapshotError,
-  OrchestrationGetSnapshotInput,
   OrchestrationGetTurnDiffError,
   OrchestrationGetTurnDiffInput,
   OrchestrationReplayEventsError,
@@ -81,9 +84,12 @@ export const WS_METHODS = {
   // Shell methods
   shellOpenInEditor: "shell.openInEditor",
 
+  // Filesystem methods
+  filesystemBrowse: "filesystem.browse",
+
   // Git methods
   gitPull: "git.pull",
-  gitStatus: "git.status",
+  gitRefreshStatus: "git.refreshStatus",
   gitRunStackedAction: "git.runStackedAction",
   gitListBranches: "git.listBranches",
   gitCreateWorktree: "git.createWorktree",
@@ -110,10 +116,11 @@ export const WS_METHODS = {
   serverUpdateSettings: "server.updateSettings",
 
   // Streaming subscriptions
-  subscribeOrchestrationDomainEvents: "subscribeOrchestrationDomainEvents",
+  subscribeGitStatus: "subscribeGitStatus",
   subscribeTerminalEvents: "subscribeTerminalEvents",
   subscribeServerConfig: "subscribeServerConfig",
   subscribeServerLifecycle: "subscribeServerLifecycle",
+  subscribeAuthAccess: "subscribeAuthAccess",
 } as const;
 
 export const WsServerUpsertKeybindingRpc = Rpc.make(WS_METHODS.serverUpsertKeybinding, {
@@ -162,16 +169,29 @@ export const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
   error: OpenError,
 });
 
-export const WsGitStatusRpc = Rpc.make(WS_METHODS.gitStatus, {
+export const WsFilesystemBrowseRpc = Rpc.make(WS_METHODS.filesystemBrowse, {
+  payload: FilesystemBrowseInput,
+  success: FilesystemBrowseResult,
+  error: FilesystemBrowseError,
+});
+
+export const WsSubscribeGitStatusRpc = Rpc.make(WS_METHODS.subscribeGitStatus, {
   payload: GitStatusInput,
-  success: GitStatusResult,
+  success: GitStatusStreamEvent,
   error: GitManagerServiceError,
+  stream: true,
 });
 
 export const WsGitPullRpc = Rpc.make(WS_METHODS.gitPull, {
   payload: GitPullInput,
   success: GitPullResult,
   error: GitCommandError,
+});
+
+export const WsGitRefreshStatusRpc = Rpc.make(WS_METHODS.gitRefreshStatus, {
+  payload: GitStatusInput,
+  success: GitStatusResult,
+  error: GitManagerServiceError,
 });
 
 export const WsGitRunStackedActionRpc = Rpc.make(WS_METHODS.gitRunStackedAction, {
@@ -212,11 +232,13 @@ export const WsGitRemoveWorktreeRpc = Rpc.make(WS_METHODS.gitRemoveWorktree, {
 
 export const WsGitCreateBranchRpc = Rpc.make(WS_METHODS.gitCreateBranch, {
   payload: GitCreateBranchInput,
+  success: GitCreateBranchResult,
   error: GitCommandError,
 });
 
 export const WsGitCheckoutRpc = Rpc.make(WS_METHODS.gitCheckout, {
   payload: GitCheckoutInput,
+  success: GitCheckoutResult,
   error: GitCommandError,
 });
 
@@ -257,12 +279,6 @@ export const WsTerminalCloseRpc = Rpc.make(WS_METHODS.terminalClose, {
   error: TerminalError,
 });
 
-export const WsOrchestrationGetSnapshotRpc = Rpc.make(ORCHESTRATION_WS_METHODS.getSnapshot, {
-  payload: OrchestrationGetSnapshotInput,
-  success: OrchestrationRpcSchemas.getSnapshot.output,
-  error: OrchestrationGetSnapshotError,
-});
-
 export const WsOrchestrationDispatchCommandRpc = Rpc.make(
   ORCHESTRATION_WS_METHODS.dispatchCommand,
   {
@@ -293,11 +309,19 @@ export const WsOrchestrationReplayEventsRpc = Rpc.make(ORCHESTRATION_WS_METHODS.
   error: OrchestrationReplayEventsError,
 });
 
-export const WsSubscribeOrchestrationDomainEventsRpc = Rpc.make(
-  WS_METHODS.subscribeOrchestrationDomainEvents,
+export const WsOrchestrationSubscribeShellRpc = Rpc.make(ORCHESTRATION_WS_METHODS.subscribeShell, {
+  payload: OrchestrationRpcSchemas.subscribeShell.input,
+  success: OrchestrationRpcSchemas.subscribeShell.output,
+  error: OrchestrationGetSnapshotError,
+  stream: true,
+});
+
+export const WsOrchestrationSubscribeThreadRpc = Rpc.make(
+  ORCHESTRATION_WS_METHODS.subscribeThread,
   {
-    payload: Schema.Struct({}),
-    success: OrchestrationEvent,
+    payload: OrchestrationRpcSchemas.subscribeThread.input,
+    success: OrchestrationRpcSchemas.subscribeThread.output,
+    error: OrchestrationGetSnapshotError,
     stream: true,
   },
 );
@@ -321,6 +345,12 @@ export const WsSubscribeServerLifecycleRpc = Rpc.make(WS_METHODS.subscribeServer
   stream: true,
 });
 
+export const WsSubscribeAuthAccessRpc = Rpc.make(WS_METHODS.subscribeAuthAccess, {
+  payload: Schema.Struct({}),
+  success: AuthAccessStreamEvent,
+  stream: true,
+});
+
 export const WsRpcGroup = RpcGroup.make(
   WsServerGetConfigRpc,
   WsServerRefreshProvidersRpc,
@@ -330,8 +360,10 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectsSearchEntriesRpc,
   WsProjectsWriteFileRpc,
   WsShellOpenInEditorRpc,
-  WsGitStatusRpc,
+  WsFilesystemBrowseRpc,
+  WsSubscribeGitStatusRpc,
   WsGitPullRpc,
+  WsGitRefreshStatusRpc,
   WsGitRunStackedActionRpc,
   WsGitResolvePullRequestRpc,
   WsGitPreparePullRequestThreadRpc,
@@ -347,13 +379,14 @@ export const WsRpcGroup = RpcGroup.make(
   WsTerminalClearRpc,
   WsTerminalRestartRpc,
   WsTerminalCloseRpc,
-  WsSubscribeOrchestrationDomainEventsRpc,
   WsSubscribeTerminalEventsRpc,
   WsSubscribeServerConfigRpc,
   WsSubscribeServerLifecycleRpc,
-  WsOrchestrationGetSnapshotRpc,
+  WsSubscribeAuthAccessRpc,
   WsOrchestrationDispatchCommandRpc,
   WsOrchestrationGetTurnDiffRpc,
   WsOrchestrationGetFullThreadDiffRpc,
   WsOrchestrationReplayEventsRpc,
+  WsOrchestrationSubscribeShellRpc,
+  WsOrchestrationSubscribeThreadRpc,
 );

@@ -3,16 +3,22 @@ import { Effect, Path } from "effect";
 import {
   readPathFromLoginShell,
   readEnvironmentFromWindowsShell,
-  resolveLoginShell,
   resolveWindowsEnvironment,
   type CommandAvailabilityOptions,
   type WindowsShellEnvironmentReader,
+  listLoginShellCandidates,
+  mergePathEntries,
+  readPathFromLaunchctl,
 } from "@t3tools/shared/shell";
 
 type WindowsCommandAvailabilityChecker = (
   command: string,
   options?: CommandAvailabilityOptions,
 ) => boolean;
+
+function logPathHydrationWarning(message: string, error?: unknown): void {
+  console.warn(`[server] ${message}`, error instanceof Error ? error.message : (error ?? ""));
+}
 
 export function fixPath(
   options: {
@@ -21,10 +27,15 @@ export function fixPath(
     readPath?: typeof readPathFromLoginShell;
     readWindowsEnvironment?: WindowsShellEnvironmentReader;
     isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
+    readLaunchctlPath?: typeof readPathFromLaunchctl;
+    userShell?: string;
+    logWarning?: (message: string, error?: unknown) => void;
   } = {},
 ): void {
   const platform = options.platform ?? process.platform;
   const env = options.env ?? process.env;
+  const logWarning = options.logWarning ?? logPathHydrationWarning;
+  const readPath = options.readPath ?? readPathFromLoginShell;
 
   try {
     if (platform === "win32") {
@@ -44,14 +55,29 @@ export function fixPath(
 
     if (platform !== "darwin" && platform !== "linux") return;
 
-    const shell = resolveLoginShell(platform, env.SHELL);
-    if (!shell) return;
-    const result = (options.readPath ?? readPathFromLoginShell)(shell);
-    if (result) {
-      env.PATH = result;
+    let shellPath: string | undefined;
+    for (const shell of listLoginShellCandidates(platform, env.SHELL, options.userShell)) {
+      try {
+        shellPath = readPath(shell);
+      } catch (error) {
+        logWarning(`Failed to read PATH from login shell ${shell}.`, error);
+      }
+
+      if (shellPath) {
+        break;
+      }
     }
-  } catch {
-    // Silently ignore — keep default PATH
+
+    const launchctlPath =
+      platform === "darwin" && !shellPath
+        ? (options.readLaunchctlPath ?? readPathFromLaunchctl)()
+        : undefined;
+    const mergedPath = mergePathEntries(shellPath ?? launchctlPath, env.PATH, platform);
+    if (mergedPath) {
+      env.PATH = mergedPath;
+    }
+  } catch (error) {
+    logWarning("Failed to hydrate PATH from the user environment.", error);
   }
 }
 
