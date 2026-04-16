@@ -24,7 +24,6 @@ export function mergeWinUpdateManifests(
 
 export function serializeWinUpdateManifest(manifest: WindowsUpdateManifest): string {
   return serializeUpdateManifest(manifest, {
-    quoteVersion: true,
     platformLabel: "Windows",
   });
 }

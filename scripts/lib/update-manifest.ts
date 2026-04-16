@@ -250,12 +250,10 @@ function serializeScalarValue(value: UpdateManifestScalar): string {
 export function serializeUpdateManifest(
   manifest: UpdateManifest,
   options: {
-    readonly quoteVersion: boolean;
     readonly platformLabel: string;
   },
 ): string {
-  const version = options.quoteVersion ? quoteYamlString(manifest.version) : manifest.version;
-  const lines = [`version: ${version}`, "files:"];
+  const lines = [`version: ${quoteYamlString(manifest.version)}`, "files:"];
 
   for (const file of manifest.files) {
     lines.push(`  - url: ${file.url}`);

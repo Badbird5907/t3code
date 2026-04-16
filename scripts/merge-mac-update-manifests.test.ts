@@ -106,7 +106,7 @@ releaseDate: '2026-03-07T10:36:07.540Z'
     assert.equal(manifest.extras.stagingPercentage, 50);
   });
 
-  it("serializes versions without quotes for compatibility", () => {
+  it("round-trips numeric-looking versions as strings", () => {
     const original = parseMacUpdateManifest(
       `version: '1.0'
 files:
@@ -119,6 +119,9 @@ releaseDate: '2026-03-07T10:36:07.540Z'
     );
 
     const serialized = serializeMacUpdateManifest(original);
-    assert.ok(serialized.includes("version: 1.0"));
+    assert.ok(serialized.includes("version: '1.0'"));
+
+    const reparsed = parseMacUpdateManifest(serialized, "latest-mac.yml");
+    assert.equal(reparsed.version, "1.0");
   });
 });

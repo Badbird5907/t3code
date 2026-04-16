@@ -24,7 +24,6 @@ export function mergeMacUpdateManifests(
 
 export function serializeMacUpdateManifest(manifest: MacUpdateManifest): string {
   return serializeUpdateManifest(manifest, {
-    quoteVersion: false,
     platformLabel: "macOS",
   });
 }
