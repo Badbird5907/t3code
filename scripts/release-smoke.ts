@@ -186,7 +186,13 @@ try {
   const { arm64Path, x64Path } = writeMacManifestFixtures(tempRoot);
   execFileSync(
     process.execPath,
-    [resolve(repoRoot, "scripts/merge-mac-update-manifests.ts"), arm64Path, x64Path],
+    [
+      resolve(repoRoot, "scripts/merge-update-manifests.ts"),
+      "--platform",
+      "mac",
+      arm64Path,
+      x64Path,
+    ],
     {
       cwd: repoRoot,
       stdio: "inherit",
@@ -208,7 +214,13 @@ try {
   const { arm64Path: winArm64Path, x64Path: winX64Path } = writeWindowsManifestFixtures(tempRoot);
   execFileSync(
     process.execPath,
-    [resolve(repoRoot, "scripts/merge-win-update-manifests.ts"), winArm64Path, winX64Path],
+    [
+      resolve(repoRoot, "scripts/merge-update-manifests.ts"),
+      "--platform",
+      "win",
+      winArm64Path,
+      winX64Path,
+    ],
     {
       cwd: repoRoot,
       stdio: "inherit",

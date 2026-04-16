@@ -356,14 +356,14 @@ jobs:
           for x64_manifest in release-assets/*-mac-x64.yml; do
             arm64_manifest="${x64_manifest%-x64.yml}.yml"
             if [[ -f "$arm64_manifest" ]]; then
-              node scripts/merge-mac-update-manifests.ts "$arm64_manifest" "$x64_manifest"
+              node scripts/merge-update-manifests.ts --platform mac "$arm64_manifest" "$x64_manifest"
               rm -f "$x64_manifest"
             fi
           done
 
       - name: Merge Windows updater manifests
         run: |
-          node scripts/merge-win-update-manifests.ts \
+          node scripts/merge-update-manifests.ts --platform win \
             release-assets/latest-win-arm64.yml \
             release-assets/latest-win-x64.yml \
             release-assets/latest.yml
