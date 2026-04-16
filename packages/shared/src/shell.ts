@@ -281,9 +281,9 @@ function normalizePathEntryForComparison(entry: string, platform: NodeJS.Platfor
 }
 
 export function mergePathValues(
-  platform: NodeJS.Platform,
   preferredPath: string | undefined,
   inheritedPath: string | undefined,
+  platform: NodeJS.Platform,
 ): string | undefined {
   const delimiter = pathDelimiterForPlatform(platform);
   const merged: string[] = [];
@@ -461,9 +461,9 @@ export function resolveWindowsEnvironment(
   const shellPath = readWindowsEnvironmentSafely(readEnvironment, ["PATH"], {
     loadProfile: false,
   }).PATH;
-  const mergedPath = mergePathValues("win32", shellPath, inheritedPath);
+  const mergedPath = mergePathValues(shellPath, inheritedPath, "win32");
   const knownCliPath = resolveKnownWindowsCliDirs(env).join(WINDOWS_PATH_DELIMITER);
-  const baselinePath = mergePathValues("win32", knownCliPath, mergedPath);
+  const baselinePath = mergePathValues(knownCliPath, mergedPath, "win32");
   const baselinePatch: Partial<NodeJS.ProcessEnv> = baselinePath ? { PATH: baselinePath } : {};
   const baselineEnv = mergeWindowsEnv(env, baselinePatch);
 
@@ -476,7 +476,7 @@ export function resolveWindowsEnvironment(
     ["PATH", "FNM_DIR", "FNM_MULTISHELL_PATH"],
     { loadProfile: true },
   );
-  const profiledPath = mergePathValues("win32", profiledEnvironment.PATH, baselinePath);
+  const profiledPath = mergePathValues(profiledEnvironment.PATH, baselinePath, "win32");
   const profiledPatch: Partial<NodeJS.ProcessEnv> = {
     ...(profiledPath ? { PATH: profiledPath } : {}),
     ...(profiledEnvironment.FNM_DIR ? { FNM_DIR: profiledEnvironment.FNM_DIR } : {}),
