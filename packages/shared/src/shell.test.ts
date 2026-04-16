@@ -217,6 +217,23 @@ describe("readEnvironmentFromWindowsShell", () => {
     );
   });
 
+  it("strips CRLF delimiters from captured PowerShell values", () => {
+    const execFile = vi.fn<
+      (
+        file: string,
+        args: ReadonlyArray<string>,
+        options: { encoding: "utf8"; timeout: number },
+      ) => string
+    >(
+      () =>
+        "__T3CODE_ENV_FNM_DIR_START__\r\nC:\\Users\\testuser\\AppData\\Roaming\\fnm\r\n__T3CODE_ENV_FNM_DIR_END__\r\n",
+    );
+
+    expect(readEnvironmentFromWindowsShell(["FNM_DIR"], execFile)).toEqual({
+      FNM_DIR: "C:\\Users\\testuser\\AppData\\Roaming\\fnm",
+    });
+  });
+
   it("omits -NoProfile when loadProfile is enabled", () => {
     const execFile = vi.fn<
       (
@@ -371,7 +388,7 @@ describe("resolveWindowsEnvironment", () => {
             }
           : { PATH: "C:\\Shell\\Bin;C:\\Windows\\System32" },
     );
-    const commandAvailable = vi.fn().mockReturnValueOnce(false).mockReturnValueOnce(true);
+    const commandAvailable = vi.fn(() => false);
 
     expect(
       resolveWindowsEnvironment(
@@ -405,6 +422,7 @@ describe("resolveWindowsEnvironment", () => {
     expect(readEnvironment).toHaveBeenNthCalledWith(2, ["PATH", "FNM_DIR", "FNM_MULTISHELL_PATH"], {
       loadProfile: true,
     });
+    expect(commandAvailable).toHaveBeenCalledTimes(1);
   });
 
   it("keeps the baseline env when profiled probe still does not resolve node", () => {
@@ -435,5 +453,6 @@ describe("resolveWindowsEnvironment", () => {
       ].join(";"),
       FNM_DIR: "C:\\Users\\testuser\\AppData\\Roaming\\fnm",
     });
+    expect(commandAvailable).toHaveBeenCalledTimes(1);
   });
 });

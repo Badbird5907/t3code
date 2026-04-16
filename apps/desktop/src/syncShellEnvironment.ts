@@ -4,10 +4,15 @@ import {
   readPathFromLaunchctl,
   readEnvironmentFromLoginShell,
   resolveWindowsEnvironment,
-  type ShellEnvironmentReader,
-  type WindowsShellEnvironmentReader,
+  ShellEnvironmentReader,
+  WindowsShellEnvironmentReader,
   type CommandAvailabilityOptions,
 } from "@t3tools/shared/shell";
+
+type WindowsCommandAvailabilityChecker = (
+  command: string,
+  options?: CommandAvailabilityOptions,
+) => boolean;
 
 const LOGIN_SHELL_ENV_NAMES = [
   "PATH",
@@ -19,11 +24,6 @@ const LOGIN_SHELL_ENV_NAMES = [
   "XDG_DATA_HOME",
 ] as const;
 
-type WindowsCommandAvailabilityChecker = (
-  command: string,
-  options?: CommandAvailabilityOptions,
-) => boolean;
-
 function logShellEnvironmentWarning(message: string, error?: unknown): void {
   console.warn(`[desktop] ${message}`, error instanceof Error ? error.message : (error ?? ""));
 }
@@ -33,14 +33,15 @@ export function syncShellEnvironment(
   options: {
     platform?: NodeJS.Platform;
     readEnvironment?: ShellEnvironmentReader;
+    readWindowsEnvironment?: WindowsShellEnvironmentReader;
+    isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
     readLaunchctlPath?: typeof readPathFromLaunchctl;
     userShell?: string;
     logWarning?: (message: string, error?: unknown) => void;
-    readWindowsEnvironment?: WindowsShellEnvironmentReader;
-    isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
   } = {},
 ): void {
   const platform = options.platform ?? process.platform;
+
   const logWarning = options.logWarning ?? logShellEnvironmentWarning;
   const readEnvironment = options.readEnvironment ?? readEnvironmentFromLoginShell;
   const shellEnvironment: Partial<Record<string, string>> = {};

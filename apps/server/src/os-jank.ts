@@ -1,14 +1,14 @@
 import * as OS from "node:os";
 import { Effect, Path } from "effect";
 import {
-  listLoginShellCandidates,
-  mergePathEntries,
-  readEnvironmentFromWindowsShell,
-  readPathFromLaunchctl,
   readPathFromLoginShell,
+  readEnvironmentFromWindowsShell,
   resolveWindowsEnvironment,
   type CommandAvailabilityOptions,
   type WindowsShellEnvironmentReader,
+  listLoginShellCandidates,
+  mergePathEntries,
+  readPathFromLaunchctl,
 } from "@t3tools/shared/shell";
 
 type WindowsCommandAvailabilityChecker = (
@@ -25,11 +25,11 @@ export function fixPath(
     env?: NodeJS.ProcessEnv;
     platform?: NodeJS.Platform;
     readPath?: typeof readPathFromLoginShell;
+    readWindowsEnvironment?: WindowsShellEnvironmentReader;
+    isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
     readLaunchctlPath?: typeof readPathFromLaunchctl;
     userShell?: string;
     logWarning?: (message: string, error?: unknown) => void;
-    readWindowsEnvironment?: WindowsShellEnvironmentReader;
-    isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
   } = {},
 ): void {
   const platform = options.platform ?? process.platform;

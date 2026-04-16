@@ -16,6 +16,15 @@ type ExecFileSyncLike = (
   options: { encoding: "utf8"; timeout: number },
 ) => string;
 
+export interface CommandAvailabilityOptions {
+  readonly platform?: NodeJS.Platform;
+  readonly env?: NodeJS.ProcessEnv;
+}
+
+export interface WindowsEnvironmentProbeOptions {
+  readonly loadProfile?: boolean;
+}
+
 function trimNonEmpty(value: string | null | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed && trimmed.length > 0 ? trimmed : undefined;
@@ -27,15 +36,6 @@ function readUserLoginShell(): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-export interface CommandAvailabilityOptions {
-  readonly platform?: NodeJS.Platform;
-  readonly env?: NodeJS.ProcessEnv;
-}
-
-export interface WindowsEnvironmentProbeOptions {
-  readonly loadProfile?: boolean;
 }
 
 export function listLoginShellCandidates(
@@ -57,14 +57,6 @@ export function listLoginShellCandidates(
   }
 
   return candidates;
-}
-
-export function resolveLoginShell(
-  platform: NodeJS.Platform,
-  shell: string | undefined,
-  userShell = readUserLoginShell(),
-): string | undefined {
-  return listLoginShellCandidates(platform, shell, userShell)[0];
 }
 
 export function extractPathFromShellOutput(output: string): string | null {
@@ -99,6 +91,30 @@ export function readPathFromLaunchctl(
   } catch {
     return undefined;
   }
+}
+
+export function mergePathEntries(
+  preferredPath: string | undefined,
+  inheritedPath: string | undefined,
+  platform: NodeJS.Platform,
+): string | undefined {
+  const delimiter = platform === "win32" ? ";" : ":";
+  const merged: string[] = [];
+  const seen = new Set<string>();
+
+  for (const pathValue of [preferredPath, inheritedPath]) {
+    if (!pathValue) continue;
+    for (const entry of pathValue.split(delimiter)) {
+      const trimmedEntry = entry.trim();
+      if (!trimmedEntry || seen.has(trimmedEntry)) {
+        continue;
+      }
+      seen.add(trimmedEntry);
+      merged.push(trimmedEntry);
+    }
+  }
+
+  return merged.length > 0 ? merged.join(delimiter) : undefined;
 }
 
 function envCaptureStart(name: string): string {
@@ -289,14 +305,6 @@ export function mergePathValues(
   return merged.length > 0 ? merged.join(delimiter) : undefined;
 }
 
-export function mergePathEntries(
-  preferredPath: string | undefined,
-  inheritedPath: string | undefined,
-  platform: NodeJS.Platform,
-): string | undefined {
-  return mergePathValues(platform, preferredPath, inheritedPath);
-}
-
 function readEnvPath(env: NodeJS.ProcessEnv): string | undefined {
   return env.PATH ?? env.Path ?? env.path;
 }
@@ -474,13 +482,7 @@ export function resolveWindowsEnvironment(
       ? { FNM_MULTISHELL_PATH: profiledEnvironment.FNM_MULTISHELL_PATH }
       : {}),
   };
-  const finalPatch =
-    Object.keys(profiledPatch).length > 0 ? { ...baselinePatch, ...profiledPatch } : baselinePatch;
-  const finalEnv = mergeWindowsEnv(env, finalPatch);
-
-  if (commandAvailable("node", { platform: "win32", env: finalEnv })) {
-    return finalPatch;
-  }
-
-  return finalPatch;
+  return Object.keys(profiledPatch).length > 0
+    ? { ...baselinePatch, ...profiledPatch }
+    : baselinePatch;
 }
