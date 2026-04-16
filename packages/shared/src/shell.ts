@@ -169,8 +169,10 @@ function extractEnvironmentValue(output: string, name: string): string | undefin
   const endIndex = output.indexOf(endMarker, valueStartIndex);
   if (endIndex === -1) return undefined;
 
-  let value = output.slice(valueStartIndex, endIndex);
-  value = value.replace(/^\r?\n/, "").replace(/\r?\n$/, "");
+  const value = output
+    .slice(valueStartIndex, endIndex)
+    .replace(/^\r?\n/, "")
+    .replace(/\r?\n$/, "");
 
   return value.length > 0 ? value : undefined;
 }
