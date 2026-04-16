@@ -130,6 +130,7 @@ import {
   resolveThreadRowClassName,
   resolveThreadStatusPill,
   orderItemsByPreferredIds,
+  shouldSkipDeleteConfirmation,
   shouldClearThreadSelectionOnMouseDown,
   sortProjectsForSidebar,
   useThreadJumpHintVisibility,
@@ -1412,7 +1413,6 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       project.id,
       project.name,
       projectThreads.length,
-      shouldSkipDeleteConfirmation,
       suppressProjectClickForContextMenuRef,
     ],
   );
