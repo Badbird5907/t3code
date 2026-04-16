@@ -3,7 +3,10 @@ import {
   mergePathEntries,
   readPathFromLaunchctl,
   readEnvironmentFromLoginShell,
-  ShellEnvironmentReader,
+  resolveWindowsEnvironment,
+  type ShellEnvironmentReader,
+  type WindowsShellEnvironmentReader,
+  type CommandAvailabilityOptions,
 } from "@t3tools/shared/shell";
 
 const LOGIN_SHELL_ENV_NAMES = [
@@ -15,6 +18,11 @@ const LOGIN_SHELL_ENV_NAMES = [
   "XDG_CONFIG_HOME",
   "XDG_DATA_HOME",
 ] as const;
+
+type WindowsCommandAvailabilityChecker = (
+  command: string,
+  options?: CommandAvailabilityOptions,
+) => boolean;
 
 function logShellEnvironmentWarning(message: string, error?: unknown): void {
   console.warn(`[desktop] ${message}`, error instanceof Error ? error.message : (error ?? ""));
@@ -28,16 +36,35 @@ export function syncShellEnvironment(
     readLaunchctlPath?: typeof readPathFromLaunchctl;
     userShell?: string;
     logWarning?: (message: string, error?: unknown) => void;
+    readWindowsEnvironment?: WindowsShellEnvironmentReader;
+    isWindowsCommandAvailable?: WindowsCommandAvailabilityChecker;
   } = {},
 ): void {
   const platform = options.platform ?? process.platform;
-  if (platform !== "darwin" && platform !== "linux") return;
-
   const logWarning = options.logWarning ?? logShellEnvironmentWarning;
   const readEnvironment = options.readEnvironment ?? readEnvironmentFromLoginShell;
   const shellEnvironment: Partial<Record<string, string>> = {};
 
   try {
+    if (platform === "win32") {
+      const repairedEnvironment = resolveWindowsEnvironment(env, {
+        ...(options.readWindowsEnvironment
+          ? { readEnvironment: options.readWindowsEnvironment }
+          : {}),
+        ...(options.isWindowsCommandAvailable
+          ? { commandAvailable: options.isWindowsCommandAvailable }
+          : {}),
+      });
+      for (const [key, value] of Object.entries(repairedEnvironment)) {
+        if (value !== undefined) {
+          env[key] = value;
+        }
+      }
+      return;
+    }
+
+    if (platform !== "darwin" && platform !== "linux") return;
+
     for (const shell of listLoginShellCandidates(platform, env.SHELL, options.userShell)) {
       try {
         Object.assign(shellEnvironment, readEnvironment(shell, LOGIN_SHELL_ENV_NAMES));

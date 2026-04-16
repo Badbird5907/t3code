@@ -288,6 +288,15 @@ jobs:
             done
           fi
 
+          # Both Windows NSIS builds emit "latest.yml". Rename both per-job
+          # copies so the release job can merge them back into one canonical
+          # Windows latest.yml for electron-updater discovery.
+          if [[ "${{ matrix.platform }}" == "win" ]]; then
+            if [[ -f release-publish/latest.yml ]]; then
+              mv release-publish/latest.yml "release-publish/latest-win-${{ matrix.arch }}.yml"
+            fi
+          fi
+
       - name: Upload build artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -387,6 +396,14 @@ jobs:
             echo "No Windows updater manifests found to merge." >&2
             exit 1
           fi
+
+      - name: Merge Windows updater manifests
+        run: |
+          node scripts/merge-win-update-manifests.ts \
+            release-assets/latest-win-arm64.yml \
+            release-assets/latest-win-x64.yml \
+            release-assets/latest.yml
+          rm -f release-assets/latest-win-arm64.yml release-assets/latest-win-x64.yml
 
       - name: Publish release
         if: needs.preflight.outputs.previous_tag != ''

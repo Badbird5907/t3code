@@ -245,7 +245,7 @@ export function useThreadActions() {
   );
 
   const confirmAndDeleteThread = useCallback(
-    async (target: ScopedThreadRef) => {
+    async (target: ScopedThreadRef, opts: { skipConfirmation?: boolean } = {}) => {
       const api = readEnvironmentApi(target.environmentId);
       if (!api) return;
       const localApi = readLocalApi();
@@ -253,7 +253,7 @@ export function useThreadActions() {
       if (!resolved) return;
       const { thread } = resolved;
 
-      if (confirmThreadDelete && localApi) {
+      if (confirmThreadDelete && !opts.skipConfirmation && localApi) {
         const confirmed = await localApi.dialogs.confirm(
           [
             `Delete thread "${thread.title}"?`,

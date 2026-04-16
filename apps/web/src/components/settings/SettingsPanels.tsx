@@ -1535,7 +1535,11 @@ export function ArchivedThreadsPanel() {
   }, [projects, threads]);
 
   const handleArchivedThreadContextMenu = useCallback(
-    async (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
+    async (
+      threadRef: ScopedThreadRef,
+      position: { x: number; y: number },
+      opts: { skipConfirmation?: boolean } = {},
+    ) => {
       const api = readLocalApi();
       if (!api) return;
       const clicked = await api.contextMenu.show(
@@ -1560,7 +1564,10 @@ export function ArchivedThreadsPanel() {
       }
 
       if (clicked === "delete") {
-        await confirmAndDeleteThread(threadRef);
+        await confirmAndDeleteThread(
+          threadRef,
+          opts.skipConfirmation ? { skipConfirmation: true } : undefined,
+        );
       }
     },
     [confirmAndDeleteThread, unarchiveThread],
@@ -1598,6 +1605,9 @@ export function ArchivedThreadsPanel() {
                     {
                       x: event.clientX,
                       y: event.clientY,
+                    },
+                    {
+                      skipConfirmation: event.shiftKey,
                     },
                   );
                 }}

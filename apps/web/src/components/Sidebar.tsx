@@ -349,10 +349,14 @@ interface SidebarThreadRowProps {
     orderedProjectThreadKeys: readonly string[],
   ) => void;
   navigateToThread: (threadRef: ScopedThreadRef) => void;
-  handleMultiSelectContextMenu: (position: { x: number; y: number }) => Promise<void>;
+  handleMultiSelectContextMenu: (
+    position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
+  ) => Promise<void>;
   handleThreadContextMenu: (
     threadRef: ScopedThreadRef,
     position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
   ) => Promise<void>;
   clearSelection: () => void;
   commitRename: (
@@ -480,21 +484,29 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: SidebarThreadRowP
   const handleRowContextMenu = useCallback(
     (event: React.MouseEvent) => {
       event.preventDefault();
+      const skipConfirmation = shouldSkipDeleteConfirmation({ shiftKey: event.shiftKey });
       if (hasSelection && isSelected) {
-        void handleMultiSelectContextMenu({
-          x: event.clientX,
-          y: event.clientY,
-        });
+        void handleMultiSelectContextMenu(
+          {
+            x: event.clientX,
+            y: event.clientY,
+          },
+          { skipConfirmation },
+        );
         return;
       }
 
       if (hasSelection) {
         clearSelection();
       }
-      void handleThreadContextMenu(threadRef, {
-        x: event.clientX,
-        y: event.clientY,
-      });
+      void handleThreadContextMenu(
+        threadRef,
+        {
+          x: event.clientX,
+          y: event.clientY,
+        },
+        { skipConfirmation },
+      );
     },
     [
       clearSelection,
@@ -802,10 +814,14 @@ interface SidebarProjectThreadListProps {
     orderedProjectThreadKeys: readonly string[],
   ) => void;
   navigateToThread: (threadRef: ScopedThreadRef) => void;
-  handleMultiSelectContextMenu: (position: { x: number; y: number }) => Promise<void>;
+  handleMultiSelectContextMenu: (
+    position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
+  ) => Promise<void>;
   handleThreadContextMenu: (
     threadRef: ScopedThreadRef,
     position: { x: number; y: number },
+    opts?: { skipConfirmation?: boolean },
   ) => Promise<void>;
   clearSelection: () => void;
   commitRename: (
@@ -1322,6 +1338,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
     (event: React.MouseEvent<HTMLButtonElement>) => {
       event.preventDefault();
       suppressProjectClickForContextMenuRef.current = true;
+      const skipConfirmation = shouldSkipDeleteConfirmation({ shiftKey: event.shiftKey });
       void (async () => {
         const api = readLocalApi();
         if (!api) return;
@@ -1351,8 +1368,10 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
           return;
         }
 
-        const confirmed = await api.dialogs.confirm(`Remove project "${project.name}"?`);
-        if (!confirmed) return;
+        if (!skipConfirmation) {
+          const confirmed = await api.dialogs.confirm(`Remove project "${project.name}"?`);
+          if (!confirmed) return;
+        }
 
         try {
           const projectDraftThread = getDraftThreadByProjectRef(
@@ -1393,6 +1412,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
       project.id,
       project.name,
       projectThreads.length,
+      shouldSkipDeleteConfirmation,
       suppressProjectClickForContextMenuRef,
     ],
   );
@@ -1448,7 +1468,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   );
 
   const handleMultiSelectContextMenu = useCallback(
-    async (position: { x: number; y: number }) => {
+    async (position: { x: number; y: number }, opts: { skipConfirmation?: boolean } = {}) => {
       const api = readLocalApi();
       if (!api) return;
       const threadKeys = [...useThreadSelectionStore.getState().selectedThreadKeys];
@@ -1474,7 +1494,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
 
       if (clicked !== "delete") return;
 
-      if (appSettingsConfirmThreadDelete) {
+      if (appSettingsConfirmThreadDelete && !opts.skipConfirmation) {
         const confirmed = await api.dialogs.confirm(
           [
             `Delete ${count} thread${count === 1 ? "" : "s"}?`,
@@ -1624,7 +1644,11 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
   );
 
   const handleThreadContextMenu = useCallback(
-    async (threadRef: ScopedThreadRef, position: { x: number; y: number }) => {
+    async (
+      threadRef: ScopedThreadRef,
+      position: { x: number; y: number },
+      opts: { skipConfirmation?: boolean } = {},
+    ) => {
       const api = readLocalApi();
       if (!api) return;
       const threadKey = scopedThreadKey(threadRef);
@@ -1670,7 +1694,7 @@ const SidebarProjectItem = memo(function SidebarProjectItem(props: SidebarProjec
         return;
       }
       if (clicked !== "delete") return;
-      if (appSettingsConfirmThreadDelete) {
+      if (appSettingsConfirmThreadDelete && !opts.skipConfirmation) {
         const confirmed = await api.dialogs.confirm(
           [
             `Delete thread "${thread.title}"?`,
