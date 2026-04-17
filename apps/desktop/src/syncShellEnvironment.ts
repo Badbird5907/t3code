@@ -4,9 +4,11 @@ import {
   readPathFromLaunchctl,
   readEnvironmentFromLoginShell,
   resolveWindowsEnvironment,
+} from "@t3tools/shared/shell";
+import type {
+  CommandAvailabilityOptions,
   ShellEnvironmentReader,
   WindowsShellEnvironmentReader,
-  type CommandAvailabilityOptions,
 } from "@t3tools/shared/shell";
 
 type WindowsCommandAvailabilityChecker = (
