@@ -1,7 +1,8 @@
 import { ServerSettings, type ServerSettingsPatch } from "@t3tools/contracts";
 import { Schema } from "effect";
-import { deepMerge } from "./Struct";
-import { fromLenientJson } from "./schemaJson";
+import { deepMerge } from "./Struct.ts";
+import { fromLenientJson } from "./schemaJson.ts";
+import { createModelSelection } from "./model.ts";
 
 const ServerSettingsJson = fromLenientJson(ServerSettings);
 
@@ -46,6 +47,24 @@ function shouldReplaceTextGenerationModelSelection(
   return Boolean(patch && (patch.provider !== undefined || patch.model !== undefined));
 }
 
+function mergeModelSelectionOptionsById(input: {
+  current: ReadonlyArray<{ readonly id: string; readonly value: string | boolean }> | undefined;
+  patch: ReadonlyArray<{ readonly id: string; readonly value: string | boolean }> | undefined;
+}): Array<{ id: string; value: string | boolean }> | undefined {
+  if (input.patch === undefined) {
+    return input.current ? [...input.current] : undefined;
+  }
+  if (input.patch.length === 0) {
+    return undefined;
+  }
+
+  const merged = new Map((input.current ?? []).map((selection) => [selection.id, selection.value]));
+  for (const selection of input.patch) {
+    merged.set(selection.id, selection.value);
+  }
+  return [...merged.entries()].map(([id, value]) => ({ id, value }));
+}
+
 /**
  * Applies a server settings patch while treating textGenerationModelSelection as
  * replace-on-provider/model updates. This prevents stale nested options from
@@ -57,16 +76,21 @@ export function applyServerSettingsPatch(
 ): ServerSettings {
   const selectionPatch = patch.textGenerationModelSelection;
   const next = deepMerge(current, patch);
-  if (!selectionPatch || !shouldReplaceTextGenerationModelSelection(selectionPatch)) {
+  if (!selectionPatch) {
     return next;
   }
 
+  const provider = selectionPatch.provider ?? current.textGenerationModelSelection.provider;
+  const model = selectionPatch.model ?? current.textGenerationModelSelection.model;
+  const options = shouldReplaceTextGenerationModelSelection(selectionPatch)
+    ? selectionPatch.options
+    : mergeModelSelectionOptionsById({
+        current: current.textGenerationModelSelection.options,
+        patch: selectionPatch.options,
+      });
+
   return {
     ...next,
-    textGenerationModelSelection: {
-      provider: selectionPatch.provider ?? current.textGenerationModelSelection.provider,
-      model: selectionPatch.model ?? current.textGenerationModelSelection.model,
-      ...(selectionPatch.options ? { options: selectionPatch.options } : {}),
-    },
+    textGenerationModelSelection: createModelSelection(provider, model, options),
   };
 }
