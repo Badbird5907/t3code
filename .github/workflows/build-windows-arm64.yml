@@ -1,0 +1,137 @@
+name: Build Windows ARM64
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Artifact version (defaults to the tag or desktop package version)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build_wsl_node_pty:
+    name: Build WSL node-pty (linux-arm64)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - name: Build node-pty linux-arm64 prebuild
+        shell: bash
+        run: |
+          set -euo pipefail
+          pty_pkg="$(node -e "console.log(require.resolve('node-pty/package.json', { paths: ['$GITHUB_WORKSPACE/apps/server'] }))")"
+          pty_dir="$(dirname "$pty_pkg")"
+          (cd "$pty_dir" && npx --yes node-gyp rebuild)
+          mkdir -p wsl-prebuild
+          cp "$pty_dir/build/Release/pty.node" wsl-prebuild/pty.node
+          file wsl-prebuild/pty.node
+
+      - name: Upload WSL node-pty prebuild
+        uses: actions/upload-artifact@v7
+        with:
+          name: wsl-node-pty-arm64
+          path: wsl-prebuild/pty.node
+          if-no-files-found: error
+          retention-days: 1
+
+  build_windows_arm64:
+    name: Build Windows ARM64 binary
+    needs: build_wsl_node_pty
+    runs-on: windows-11-arm
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Vite+
+        uses: voidzero-dev/setup-vp@v1
+        with:
+          node-version-file: package.json
+          cache: true
+          run-install: true
+
+      - id: version
+        name: Resolve build version
+        shell: pwsh
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          $version = $env:REQUESTED_VERSION
+          if ([string]::IsNullOrWhiteSpace($version)) {
+            if ($env:GITHUB_REF_TYPE -eq "tag") {
+              $version = $env:GITHUB_REF_NAME
+            } else {
+              $version = node -p "require('./apps/desktop/package.json').version"
+            }
+          }
+
+          $version = $version.Trim()
+          if ($version.StartsWith("v")) {
+            $version = $version.Substring(1)
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
+            Write-Error "Invalid build version: $version"
+            exit 1
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Align package versions
+        run: node scripts/update-release-package-versions.ts "${{ steps.version.outputs.version }}"
+
+      - name: Download WSL node-pty prebuild
+        uses: actions/download-artifact@v8
+        with:
+          name: wsl-node-pty-arm64
+          path: wsl-prebuild
+
+      - name: Install ARM64 Spectre-mitigated MSVC libraries
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installPath = & $vswhere -products * -latest -property installationPath
+          $setupExe = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\setup.exe"
+          $proc = Start-Process -FilePath $setupExe `
+            -ArgumentList "modify", "--installPath", "`"$installPath`"", "--add", `
+            "Microsoft.VisualStudio.Component.VC.Runtimes.ARM64.Spectre", "--quiet", "--norestart" `
+            -Wait -PassThru -NoNewWindow
+          if ($null -eq $proc -or $proc.ExitCode -ne 0) {
+            $code = if ($null -ne $proc) { $proc.ExitCode } else { 1 }
+            Write-Error "Visual Studio Installer failed with exit code $code"
+            exit $code
+          }
+
+      - name: Build unsigned Windows ARM64 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          vp run dist:desktop:artifact \
+            --platform win \
+            --target nsis \
+            --arch arm64 \
+            --build-version "${{ steps.version.outputs.version }}" \
+            --wsl-prebuild "$GITHUB_WORKSPACE/wsl-prebuild/pty.node" \
+            --verbose
+
+      - name: Upload Windows ARM64 binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: t3code-windows-arm64-${{ steps.version.outputs.version }}
+          path: release/*.exe
+          if-no-files-found: error
